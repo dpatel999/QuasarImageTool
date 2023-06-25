@@ -19,6 +19,9 @@
       @mousedown="startDrawingBox"
       @mousemove="changeBox"
       @mouseup="stopDrawingBox"
+      @touchstart="startDrawingBox"
+      @touchmove="changeBox"
+      @touchend="stopDrawingBox"
     >
       <BoundingBox
         v-if="drawingBox.active"
@@ -41,6 +44,7 @@
         :on-delete="removeBox"
         :on-resize-start="resizeStart"
         :on-resize-stop="resizeStop"
+        @mousedown.stop="startDragging(i, $event)"
       />
     </div>
   </div>
@@ -51,11 +55,15 @@ import BoundingBox from "../components/BoundingBox.vue";
 import { pick } from "lodash";
 
 const getCoursorLeft = (e) => {
-  return e.pageX;
+  return e.type === "touchstart" || e.type === "touchmove"
+    ? e.pageX - e.target.offsetLeft
+    : e.pageX;
 };
 
 const getCoursorTop = (e) => {
-  return e.pageY - 50;
+  return e.type === "touchstart" || e.type === "touchmove"
+    ? e.pageY - e.target.offsetTop
+    : e.pageY - 50;
 };
 
 export default {
@@ -73,15 +81,32 @@ export default {
       boxes: [],
       resizingBox: null,
       resizingHandle: null,
+      draggingBox: null,
+      dragStartX: 0,
+      dragStartY: 0,
+      dragging: false,
+      activeBoxIndex: null,
+      clickedBoxIndex: null,
     };
   },
   methods: {
+    normalizeEvent(e) {
+      if (e.touches) {
+        e.pageX = e.touches[0].pageX;
+        e.pageY = e.touches[0].pageY;
+        e.clientX = e.touches[0].clientX;
+        e.clientY = e.touches[0].clientY;
+      }
+      return e;
+    },
     startDrawingBox(e) {
+      e.preventDefault();
+      e = this.normalizeEvent(e);
       this.drawingBox = {
         width: 0,
         height: 0,
-        top: getCoursorTop(e),
-        left: getCoursorLeft(e),
+        top: e.pageY - e.target.offsetTop,
+        left: e.pageX - e.target.offsetLeft,
         active: true,
       };
     },
@@ -111,7 +136,9 @@ export default {
       }
     },
     makeBoxActive(i) {
-      this.activeBoxIndex = i;
+      if (!this.dragging) {
+        this.activeBoxIndex = i;
+      }
     },
     removeBox(i) {
       this.boxes = this.boxes.filter((elem, index) => {
@@ -132,7 +159,7 @@ export default {
       this.resizingHandle = handle;
     },
 
-    stopResizing() {
+    resizeStop() {
       this.resizingBox = null;
       this.resizingHandle = null;
     },
@@ -169,14 +196,71 @@ export default {
         }
       }
     },
+
+    startDragging(index, event) {
+      this.dragging = true;
+
+      const delay = 200; // time in milliseconds
+      this.dragTimeout = setTimeout(() => {
+        this.draggingBox = index;
+        this.dragStartX = event.clientX;
+        this.dragStartY = event.clientY;
+      }, delay);
+
+      this.clickedBoxIndex = index;
+
+      event.preventDefault();
+    },
+
+    handleDrag(event) {
+      if (this.draggingBox !== null) {
+        const box = this.boxes[this.draggingBox];
+        box.left += event.clientX - this.dragStartX;
+        box.top += event.clientY - this.dragStartY;
+        this.dragStartX = event.clientX;
+        this.dragStartY = event.clientY;
+      }
+    },
+
+    stopDragging() {
+      this.dragging = false;
+      clearTimeout(this.dragTimeout);
+
+      if (this.draggingBox === null) {
+        this.makeBoxActive(this.clickedBoxIndex);
+      }
+
+      this.draggingBox = null;
+      this.clickedBoxIndex = null;
+    },
   },
   mounted() {
     window.addEventListener("mousemove", this.resizeBox);
-    window.addEventListener("mouseup", this.stopResizing);
+    window.addEventListener("mouseup", this.resizeStop);
+    window.addEventListener("mousemove", this.handleDrag);
+    window.addEventListener("mouseup", this.stopDragging);
+
+    window.addEventListener("touchstart", this.startDrawingBox);
+    window.addEventListener("touchmove", this.changeBox);
+    window.addEventListener("touchend", this.stopDrawingBox);
+    window.addEventListener("touchmove", this.resizeBox);
+    window.addEventListener("touchend", this.resizeStop);
+    window.addEventListener("touchmove", this.handleDrag);
+    window.addEventListener("touchend", this.stopDragging);
   },
   beforeUnmount() {
     window.removeEventListener("mousemove", this.resizeBox);
-    window.removeEventListener("mouseup", this.stopResizing);
+    window.removeEventListener("mouseup", this.resizeStop);
+    window.removeEventListener("mousemove", this.handleDrag);
+    window.removeEventListener("mouseup", this.stopDragging);
+
+    window.removeEventListener("touchstart", this.startDrawingBox);
+    window.removeEventListener("touchmove", this.changeBox);
+    window.removeEventListener("touchend", this.stopDrawingBox);
+    window.removeEventListener("touchmove", this.resizeBox);
+    window.removeEventListener("touchend", this.resizeStop);
+    window.removeEventListener("touchmove", this.handleDrag);
+    window.removeEventListener("touchend", this.stopDragging);
   },
 };
 </script>

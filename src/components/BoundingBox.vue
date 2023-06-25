@@ -6,7 +6,7 @@
       :style="{
         top: bTop - 10 + 'px',
         left: bLeft + 'px',
-        width: bWidth + 4 + 'px',
+        width: bWidth + 'px',
       }"
     >
       {{ bLabel }}
@@ -72,7 +72,7 @@ export default {
   ],
   methods: {
     selectBox() {
-      this.onSelect(this.bIndex);
+      this.$emit("select", this.bIndex);
     },
     removeMyself() {
       this.onDelete(this.bIndex);

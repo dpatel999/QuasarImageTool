@@ -16,6 +16,7 @@
       class="box-delete"
       v-on:click="removeMyself"
       v-if="bActive"
+      v-on:touchstart.prevent="removeMyself"
       :style="{
         top: bTop - 18 + 'px',
         left: bLeft + bWidth + 'px',
@@ -33,22 +34,27 @@
       }"
       v-bind:class="{ active: bActive }"
       @mousedown="selectBox"
+      @touchstart="selectBox"
     >
       <div
         class="handle top-left"
         @mousedown="startResizing('top-left', $event)"
+        @touchstart.stop="startResizing('top-left', $event)"
       ></div>
       <div
         class="handle top-right"
         @mousedown="startResizing('top-right', $event)"
+        @touchstart="startResizing('top-right', $event)"
       ></div>
       <div
         class="handle bottom-left"
         @mousedown="startResizing('bottom-left', $event)"
+        @touchstart="startResizing('bottom-left', $event)"
       ></div>
       <div
         class="handle bottom-right"
         @mousedown="startResizing('bottom-right', $event)"
+        @touchstart="startResizing('bottom-right', $event)"
       ></div>
     </div>
   </div>
@@ -71,7 +77,8 @@ export default {
     "on-resize-stop",
   ],
   methods: {
-    selectBox() {
+    selectBox(event) {
+      event.preventDefault();
       this.$emit("select", this.bIndex);
     },
     removeMyself() {
@@ -79,6 +86,7 @@ export default {
     },
     startResizing(handleType, event) {
       // prevent event propagation to avoid selecting the box when starting to resize
+      event.preventDefault();
       event.stopPropagation();
       this.onResizeStart(this.bIndex, handleType);
     },
@@ -104,7 +112,7 @@ export default {
   font-weight: bold;
   color: red;
   cursor: pointer;
-  font-size: 24px;
+  font-size: 30px;
   font-weight: bold;
 }
 .label {

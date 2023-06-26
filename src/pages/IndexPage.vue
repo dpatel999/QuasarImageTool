@@ -8,12 +8,17 @@
           :key="i"
           v-bind:class="{ active: i === activeBoxIndex }"
         >
-          <input v-model="box.label" v-on:click="makeBoxActive(i)" />
-          <a @click="removeBox(i)">x</a>
+          <input
+            v-model="box.label"
+            v-on:click="makeBoxActive(i)"
+            v-on:touchstart.stop="makeBoxActive(i)"
+          />
+          <a @click="removeBox(i)" @touchstart="removeBox(i)">x</a>
         </li>
       </ul>
     </div>
     <div
+      ref="imageWrapper"
       id="image-wrapper"
       :style="{ backgroundImage: `url(test.jpg)` }"
       @mousedown="startDrawingBox"
@@ -45,6 +50,7 @@
         :on-resize-start="resizeStart"
         :on-resize-stop="resizeStop"
         @mousedown.stop="startDragging(i, $event)"
+        @touchstart.stop="startDragging(i, $event)"
       />
     </div>
   </div>
@@ -54,16 +60,14 @@
 import BoundingBox from "../components/BoundingBox.vue";
 import { pick } from "lodash";
 
-const getCoursorLeft = (e) => {
-  return e.type === "touchstart" || e.type === "touchmove"
-    ? e.pageX - e.target.offsetLeft
-    : e.pageX;
+const getCoursorLeft = (e, vm) => {
+  const targetRect = vm.$refs.imageWrapper.getBoundingClientRect();
+  return (e.touches ? e.touches[0].clientX : e.clientX) - targetRect.left;
 };
 
-const getCoursorTop = (e) => {
-  return e.type === "touchstart" || e.type === "touchmove"
-    ? e.pageY - e.target.offsetTop
-    : e.pageY - 50;
+const getCoursorTop = (e, vm) => {
+  const targetRect = vm.$refs.imageWrapper.getBoundingClientRect();
+  return (e.touches ? e.touches[0].clientY : e.clientY) - targetRect.top;
 };
 
 export default {
@@ -114,8 +118,8 @@ export default {
       if (this.drawingBox.active) {
         this.drawingBox = {
           ...this.drawingBox,
-          width: getCoursorLeft(e) - this.drawingBox.left,
-          height: getCoursorTop(e) - this.drawingBox.top,
+          width: getCoursorLeft(e, this) - this.drawingBox.left,
+          height: getCoursorTop(e, this) - this.drawingBox.top,
         };
       }
     },
@@ -135,16 +139,27 @@ export default {
         };
       }
     },
-    makeBoxActive(i) {
+    makeBoxActive(i, event) {
+      if (event) event.preventDefault();
       if (!this.dragging) {
         this.activeBoxIndex = i;
       }
     },
-    removeBox(i) {
+    removeBox(i, event) {
+      if (event) event.preventDefault();
       this.boxes = this.boxes.filter((elem, index) => {
         return index !== i;
       });
       this.activeBoxIndex = null;
+    },
+    removeMyself(event) {
+      if (event) event.preventDefault();
+      if (this.activeBoxIndex !== null) {
+        this.boxes = this.boxes.filter(
+          (_, index) => index !== this.activeBoxIndex
+        );
+        this.activeBoxIndex = null;
+      }
     },
     onResizeStart(boxIndex, handleType) {
       this.resizingBox = {
@@ -166,10 +181,11 @@ export default {
 
     resizeBox(e) {
       if (this.resizingBox !== null) {
+        e = this.normalizeEvent(e);
         const box = this.boxes[this.resizingBox];
         const handle = this.resizingHandle;
-        const newLeft = getCoursorLeft(e);
-        const newTop = getCoursorTop(e);
+        const newLeft = getCoursorLeft(e, this) - this.drawingBox.left;
+        const newTop = getCoursorTop(e, this) - this.drawingBox.top;
 
         // Resize depending on which handle was grabbed
         switch (handle) {
@@ -201,10 +217,20 @@ export default {
       this.dragging = true;
 
       const delay = 200; // time in milliseconds
+
+      let clientX, clientY;
+      if (event.touches) {
+        clientX = event.touches[0].clientX;
+        clientY = event.touches[0].clientY;
+      } else {
+        clientX = event.clientX;
+        clientY = event.clientY;
+      }
+
       this.dragTimeout = setTimeout(() => {
         this.draggingBox = index;
-        this.dragStartX = event.clientX;
-        this.dragStartY = event.clientY;
+        this.dragStartX = clientX;
+        this.dragStartY = clientY;
       }, delay);
 
       this.clickedBoxIndex = index;
@@ -215,10 +241,20 @@ export default {
     handleDrag(event) {
       if (this.draggingBox !== null) {
         const box = this.boxes[this.draggingBox];
-        box.left += event.clientX - this.dragStartX;
-        box.top += event.clientY - this.dragStartY;
-        this.dragStartX = event.clientX;
-        this.dragStartY = event.clientY;
+
+        let clientX, clientY;
+        if (event.touches) {
+          clientX = event.touches[0].clientX;
+          clientY = event.touches[0].clientY;
+        } else {
+          clientX = event.clientX;
+          clientY = event.clientY;
+        }
+
+        box.left += clientX - this.dragStartX;
+        box.top += clientY - this.dragStartY;
+        this.dragStartX = clientX;
+        this.dragStartY = clientY;
       }
     },
 
@@ -240,12 +276,14 @@ export default {
     window.addEventListener("mousemove", this.handleDrag);
     window.addEventListener("mouseup", this.stopDragging);
 
-    window.addEventListener("touchstart", this.startDrawingBox);
-    window.addEventListener("touchmove", this.changeBox);
+    window.addEventListener("touchstart", this.startDrawingBox, {
+      passive: false,
+    });
+    window.addEventListener("touchmove", this.changeBox, { passive: false });
     window.addEventListener("touchend", this.stopDrawingBox);
-    window.addEventListener("touchmove", this.resizeBox);
+    window.addEventListener("touchmove", this.resizeBox, { passive: false });
     window.addEventListener("touchend", this.resizeStop);
-    window.addEventListener("touchmove", this.handleDrag);
+    window.addEventListener("touchmove", this.handleDrag, { passive: false });
     window.addEventListener("touchend", this.stopDragging);
   },
   beforeUnmount() {
@@ -254,12 +292,16 @@ export default {
     window.removeEventListener("mousemove", this.handleDrag);
     window.removeEventListener("mouseup", this.stopDragging);
 
-    window.removeEventListener("touchstart", this.startDrawingBox);
-    window.removeEventListener("touchmove", this.changeBox);
+    window.removeEventListener("touchstart", this.startDrawingBox, {
+      passive: false,
+    });
+    window.removeEventListener("touchmove", this.changeBox, { passive: false });
     window.removeEventListener("touchend", this.stopDrawingBox);
-    window.removeEventListener("touchmove", this.resizeBox);
+    window.removeEventListener("touchmove", this.resizeBox, { passive: false });
     window.removeEventListener("touchend", this.resizeStop);
-    window.removeEventListener("touchmove", this.handleDrag);
+    window.removeEventListener("touchmove", this.handleDrag, {
+      passive: false,
+    });
     window.removeEventListener("touchend", this.stopDragging);
   },
 };

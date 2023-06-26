@@ -239,6 +239,8 @@ export default {
     },
 
     handleDrag(event) {
+      event = this.normalizeEvent(event);
+
       if (this.draggingBox !== null) {
         const box = this.boxes[this.draggingBox];
 

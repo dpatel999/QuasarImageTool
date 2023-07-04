@@ -1,26 +1,8 @@
 <template>
-  <div id="app">
-    <div id="label-bar">
-      <h4>Your boxes</h4>
-      <ul>
-        <li
-          v-for="(box, i) in boxes"
-          :key="i"
-          v-bind:class="{ active: i === activeBoxIndex }"
-        >
-          <input
-            v-model="box.label"
-            v-on:click="makeBoxActive(i)"
-            v-on:touchstart.stop="makeBoxActive(i)"
-          />
-          <a @click="removeBox(i)" @touchstart="removeBox(i)">x</a>
-        </li>
-      </ul>
-    </div>
+  <div id="app" class="row">
     <div
       ref="imageWrapper"
       id="image-wrapper"
-      :style="{ backgroundImage: `url(test.jpg)` }"
       @mousedown="startDrawingBox"
       @mousemove="changeBox"
       @mouseup="stopDrawingBox"
@@ -28,6 +10,12 @@
       @touchmove="changeBox"
       @touchend="stopDrawingBox"
     >
+      <q-img
+        src="test.jpg"
+        :ratio="1"
+        @load="handleImageLoad"
+        spinner-color="primary"
+      />
       <BoundingBox
         v-if="drawingBox.active"
         :b-width="drawingBox.width"
@@ -53,6 +41,32 @@
         @touchstart.stop="startDragging(i, $event)"
       />
     </div>
+    <div id="label-bar">
+      <h4>Your boxes</h4>
+      <q-list dense bordered separator>
+        <q-item
+          v-for="(box, i) in boxes"
+          :key="i"
+          v-bind:class="{ active: i === activeBoxIndex }"
+        >
+          <q-item-section>
+            <q-input
+              v-model="box.label"
+              v-on:click="makeBoxActive(i)"
+              v-on:touchstart.stop="makeBoxActive(i)"
+            />
+            <q-btn
+              flat
+              round
+              dense
+              icon="close"
+              @click="removeBox(i)"
+              @touchstart="removeBox(i)"
+            />
+          </q-item-section>
+        </q-item>
+      </q-list>
+    </div>
   </div>
 </template>
 
@@ -70,9 +84,11 @@ const getCoursorTop = (e, vm) => {
   return (e.touches ? e.touches[0].clientY : e.clientY) - targetRect.top;
 };
 
+import { QImg, QList, QItem, QItemSection, QInput, QBtn } from "quasar";
+
 export default {
   name: "app",
-  components: { BoundingBox },
+  components: { QImg, QList, QItem, QItemSection, QInput, QBtn, BoundingBox },
   data: function () {
     return {
       drawingBox: {
@@ -91,6 +107,7 @@ export default {
       dragging: false,
       activeBoxIndex: null,
       clickedBoxIndex: null,
+      splitterModel: 50,
     };
   },
   methods: {

@@ -3,6 +3,7 @@
     <div
       ref="imageWrapper"
       id="image-wrapper"
+      class="image-container"
       @mousedown="startDrawingBox"
       @mousemove="changeBox"
       @mouseup="stopDrawingBox"
@@ -13,6 +14,8 @@
       <q-img
         src="test.jpg"
         :ratio="1"
+        class="responsive-image"
+        contain
         @load="handleImageLoad"
         spinner-color="primary"
       />
@@ -73,6 +76,7 @@
 <script>
 import BoundingBox from "../components/BoundingBox.vue";
 import { pick } from "lodash";
+import { QImg, QList, QItem, QItemSection, QInput, QBtn } from "quasar";
 
 const getCoursorLeft = (e, vm) => {
   const targetRect = vm.$refs.imageWrapper.getBoundingClientRect();
@@ -83,8 +87,6 @@ const getCoursorTop = (e, vm) => {
   const targetRect = vm.$refs.imageWrapper.getBoundingClientRect();
   return (e.touches ? e.touches[0].clientY : e.clientY) - targetRect.top;
 };
-
-import { QImg, QList, QItem, QItemSection, QInput, QBtn } from "quasar";
 
 export default {
   name: "app",
@@ -99,6 +101,8 @@ export default {
         width: 0,
       },
       boxes: [],
+      originalImageWidth: null,
+      originalImageHeight: null,
       resizingBox: null,
       resizingHandle: null,
       draggingBox: null,
@@ -111,6 +115,12 @@ export default {
     };
   },
   methods: {
+    handleImageLoad() {
+      this.$nextTick(() => {
+        this.originalImageWidth = this.$refs.imageWrapper.offsetWidth;
+        this.originalImageHeight = this.$refs.imageWrapper.offsetHeight;
+      });
+    },
     normalizeEvent(e) {
       if (e.touches) {
         e.pageX = e.touches[0].pageX;
@@ -156,6 +166,7 @@ export default {
         };
       }
     },
+
     makeBoxActive(i, event) {
       if (event) event.preventDefault();
       if (!this.dragging) {
@@ -203,7 +214,6 @@ export default {
         const handle = this.resizingHandle;
         const newLeft = getCoursorLeft(e, this) - this.drawingBox.left;
         const newTop = getCoursorTop(e, this) - this.drawingBox.top;
-
         // Resize depending on which handle was grabbed
         switch (handle) {
           case "top-left":
@@ -335,16 +345,20 @@ export default {
   color: #457fb8;
 
   #image-wrapper {
-    height: 640px;
     width: 640px;
     background-repeat: no-repeat;
     position: relative;
   }
-  #label-bar {
-    float: left;
-    margin-left: 700px;
-    width: 220px;
+  .image-container {
+    width: 100%;
+  }
 
+  .responsive-image {
+    max-width: 100%;
+    height: auto;
+  }
+  #label-bar {
+    margin-left: 70px;
     ul {
       padding: 0;
 

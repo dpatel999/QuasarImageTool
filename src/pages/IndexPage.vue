@@ -119,8 +119,16 @@ export default {
       this.$nextTick(() => {
         this.originalImageWidth = this.$refs.imageWrapper.offsetWidth;
         this.originalImageHeight = this.$refs.imageWrapper.offsetHeight;
+
+        for (const box of this.boxes) {
+          box.width = box.relWidth * this.originalImageWidth;
+          box.height = box.relHeight * this.originalImageHeight;
+          box.top = box.relTop * this.originalImageHeight;
+          box.left = box.relLeft * this.originalImageWidth;
+        }
       });
     },
+
     normalizeEvent(e) {
       if (e.touches) {
         e.pageX = e.touches[0].pageX;
@@ -155,6 +163,10 @@ export default {
         if (this.drawingBox.width > 5) {
           this.boxes.push({
             ...pick(this.drawingBox, ["width", "height", "top", "left"]),
+            relWidth: this.drawingBox.width / this.originalImageWidth,
+            relHeight: this.drawingBox.height / this.originalImageHeight,
+            relTop: this.drawingBox.top / this.originalImageHeight,
+            relLeft: this.drawingBox.left / this.originalImageWidth,
           });
         }
         this.drawingBox = {
@@ -196,17 +208,14 @@ export default {
         active: true,
       };
     },
-
     resizeStart(boxIndex, handle) {
       this.resizingBox = boxIndex;
       this.resizingHandle = handle;
     },
-
     resizeStop() {
       this.resizingBox = null;
       this.resizingHandle = null;
     },
-
     resizeBox(e) {
       if (this.resizingBox !== null) {
         e = this.normalizeEvent(e);
@@ -237,13 +246,16 @@ export default {
             box.height = newTop - box.top;
             break;
         }
+        box.relWidth = box.width / this.originalImageWidth;
+        box.relHeight = box.height / this.originalImageHeight;
+        box.relTop = box.top / this.originalImageHeight;
+        box.relLeft = box.left / this.originalImageWidth;
       }
     },
-
     startDragging(index, event) {
       this.dragging = true;
 
-      const delay = 200; // time in milliseconds
+      const delay = 200;
 
       let clientX, clientY;
       if (event.touches) {
@@ -264,7 +276,6 @@ export default {
 
       event.preventDefault();
     },
-
     handleDrag(event) {
       event = this.normalizeEvent(event);
 
@@ -280,8 +291,22 @@ export default {
           clientY = event.clientY;
         }
 
-        box.left += clientX - this.dragStartX;
-        box.top += clientY - this.dragStartY;
+        const newLeft = box.left + clientX - this.dragStartX;
+        const newTop = box.top + clientY - this.dragStartY;
+
+        box.left = Math.min(
+          Math.max(newLeft, 0),
+          this.$refs.imageWrapper.offsetWidth - box.width
+        );
+        box.top = Math.min(
+          Math.max(newTop, 0),
+          this.$refs.imageWrapper.offsetHeight - box.height
+        );
+
+        // Update relative positions
+        box.relLeft = box.left / this.originalImageWidth;
+        box.relTop = box.top / this.originalImageHeight;
+
         this.dragStartX = clientX;
         this.dragStartY = clientY;
       }
@@ -298,8 +323,20 @@ export default {
       this.draggingBox = null;
       this.clickedBoxIndex = null;
     },
+    handleResize() {
+      const newWidth = this.$refs.imageWrapper.offsetWidth;
+      const newHeight = this.$refs.imageWrapper.offsetHeight;
+
+      for (const box of this.boxes) {
+        box.width = box.relWidth * newWidth;
+        box.height = box.relHeight * newHeight;
+        box.top = box.relTop * newHeight;
+        box.left = box.relLeft * newWidth;
+      }
+    },
   },
   mounted() {
+    window.addEventListener("resize", this.handleResize);
     window.addEventListener("mousemove", this.resizeBox);
     window.addEventListener("mouseup", this.resizeStop);
     window.addEventListener("mousemove", this.handleDrag);
@@ -316,6 +353,8 @@ export default {
     window.addEventListener("touchend", this.stopDragging);
   },
   beforeUnmount() {
+    window.removeEventListener("resize", this.handleResize);
+
     window.removeEventListener("mousemove", this.resizeBox);
     window.removeEventListener("mouseup", this.resizeStop);
     window.removeEventListener("mousemove", this.handleDrag);
